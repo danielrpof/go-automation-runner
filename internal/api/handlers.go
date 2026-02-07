@@ -22,38 +22,45 @@ func HealthHandler(w http.ResponseWriter, r *http.Request) {
 func JobsHandler(store *job.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		if r.Method != http.MethodPost {
+		switch r.Method {
+
+		case http.MethodPost:
+			var req CreateJobRequest
+
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				http.Error(w, "invalid JSON", http.StatusBadRequest)
+				return
+			}
+
+			if req.Command == "" {
+				http.Error(w, "command is required", http.StatusBadRequest)
+				return
+			}
+
+			newJob := &job.Job{
+				ID:        uuid.New().String(),
+				Command:   req.Command,
+				Status:    job.StatusPending,
+				CreatedAt: time.Now(),
+				UpdatedAt: time.Now(),
+			}
+
+			store.Add(newJob)
+			go job.Run(newJob)
+
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(newJob)
+
+		case http.MethodGet:
+			jobs := store.List()
+
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(jobs)
+
+		default:
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
 		}
-
-		var req CreateJobRequest
-
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "invalid JSON", http.StatusBadRequest)
-			return
-		}
-
-		if req.Command == "" {
-			http.Error(w, "command is required", http.StatusBadRequest)
-			return
-		}
-
-		newJob := &job.Job{
-			ID:        uuid.New().String(),
-			Command:   req.Command,
-			Status:    job.StatusPending,
-			CreatedAt: time.Now(),
-			UpdatedAt: time.Now(),
-		}
-
-		store.Add(newJob)
-		go job.Run(newJob)
-
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(newJob)
 	}
-
 }
 
 func JobByIDHandler(store *job.Store) http.HandlerFunc {
