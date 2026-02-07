@@ -10,5 +10,5 @@ A containerized Go API for executing predefined operational jobs on a Linux serv
 
 ## Running locally
 ```bash
-export API_KEY=dev-secret-key
+export API_KEY="api_key"
 go run cmd/server/main.go
