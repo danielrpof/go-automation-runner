@@ -17,7 +17,6 @@ func main() {
 	}
 
 	jobStore := job.NewStore()
-
 	mux := http.NewServeMux()
 
 	//public

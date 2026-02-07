@@ -28,6 +28,7 @@ func JobsHandler(store *job.Store) http.HandlerFunc {
 		}
 
 		var req CreateJobRequest
+
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, "invalid JSON", http.StatusBadRequest)
 			return
@@ -47,7 +48,6 @@ func JobsHandler(store *job.Store) http.HandlerFunc {
 		}
 
 		store.Add(newJob)
-
 		go job.Run(newJob)
 
 		w.Header().Set("Content-Type", "application/json")
@@ -72,7 +72,6 @@ func JobByIDHandler(store *job.Store) http.HandlerFunc {
 		}
 
 		jobID := parts[2]
-
 		j, ok := store.Get(jobID)
 		if !ok {
 			http.Error(w, "job not found", http.StatusNotFound)

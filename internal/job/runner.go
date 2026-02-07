@@ -24,7 +24,6 @@ func Run(job *Job) {
 	cmd.Stderr = &stderr
 
 	err := cmd.Run()
-
 	if err != nil {
 		job.Status = StatusFailed
 		job.Error = stderr.String()
