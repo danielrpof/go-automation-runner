@@ -24,12 +24,13 @@ func Run(job *Job) {
 	cmd.Stderr = &stderr
 
 	err := cmd.Run()
+	job.Stdout = stdout.String()
+	job.Stderr = stderr.String()
+
 	if err != nil {
 		job.Status = StatusFailed
-		job.Error = stderr.String()
 	} else {
 		job.Status = StatusCompleted
-		job.Output = stdout.String()
 	}
 
 	job.UpdatedAt = time.Now()
