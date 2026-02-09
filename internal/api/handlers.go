@@ -7,8 +7,21 @@ import (
 	"time"
 
 	"github.com/danielrpof/go-automation-runner/internal/job"
+	"github.com/danielrpof/go-automation-runner/internal/store"
 	"github.com/google/uuid"
 )
+
+// AllowedJobs defines the allowlist of commands that can be executed
+var AllowedJobs = map[string]string{
+	"disk-check":   "df -h",
+	"memory-check": "free -m",
+	"uptime":       "uptime",
+	"list-procs":   "ps aux | head -20",
+	"say-hello":    "echo Hello from automation runner!",
+	"say_hello":    "echo Hello from automation runner!",
+	"echo-test":    "echo This is a test",
+	"date":         "date",
+}
 
 func HealthHandler(w http.ResponseWriter, r *http.Request) {
 	response := map[string]string{
@@ -19,7 +32,7 @@ func HealthHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-func JobsHandler(store *job.Store) http.HandlerFunc {
+func JobsHandler(store store.JobStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		switch r.Method {
@@ -32,27 +45,40 @@ func JobsHandler(store *job.Store) http.HandlerFunc {
 				return
 			}
 
-			if req.Command == "" {
-				http.Error(w, "command is required", http.StatusBadRequest)
+			if req.Job == "" {
+				http.Error(w, "job is required", http.StatusBadRequest)
+				return
+			}
+
+			cmdArgs, ok := AllowedJobs[req.Job]
+			if !ok {
+				http.Error(w, "job not allowed", http.StatusBadRequest)
 				return
 			}
 
 			newJob := &job.Job{
 				ID:        uuid.New().String(),
-				Command:   req.Command,
+				Command:   cmdArgs,
 				Status:    job.StatusPending,
 				CreatedAt: time.Now(),
 				UpdatedAt: time.Now(),
 			}
 
-			store.Add(newJob)
+			if err := store.Add(newJob); err != nil {
+				http.Error(w, "failed to create job", http.StatusInternalServerError)
+				return
+			}
 			go job.Run(newJob)
 
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(newJob)
 
 		case http.MethodGet:
-			jobs := store.List()
+			jobs, err := store.List()
+			if err != nil {
+				http.Error(w, "failed to list jobs", http.StatusInternalServerError)
+				return
+			}
 
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(jobs)
@@ -63,7 +89,7 @@ func JobsHandler(store *job.Store) http.HandlerFunc {
 	}
 }
 
-func JobByIDHandler(store *job.Store) http.HandlerFunc {
+func JobByIDHandler(store store.JobStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		if r.Method != http.MethodGet {
@@ -79,8 +105,8 @@ func JobByIDHandler(store *job.Store) http.HandlerFunc {
 		}
 
 		jobID := parts[2]
-		j, ok := store.Get(jobID)
-		if !ok {
+		j, err := store.Get(jobID)
+		if err != nil {
 			http.Error(w, "job not found", http.StatusNotFound)
 			return
 		}
@@ -91,5 +117,5 @@ func JobByIDHandler(store *job.Store) http.HandlerFunc {
 }
 
 type CreateJobRequest struct {
-	Command string `json:"command"`
+	Job string `json:"job"`
 }
