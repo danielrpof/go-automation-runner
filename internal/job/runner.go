@@ -2,21 +2,29 @@ package job
 
 import (
 	"bytes"
+	"context"
 	"os/exec"
 	"runtime"
 	"time"
 )
 
-func Run(job *Job) {
+type JobUpdater interface {
+	Update(job *Job) error
+}
+
+func Run(job *Job, store JobUpdater) {
 	job.Status = StatusRunning
 	job.UpdatedAt = time.Now()
+	store.Update(job)
 
 	var cmd *exec.Cmd
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 
 	if runtime.GOOS == "windows" {
-		cmd = exec.Command("cmd", "/C", job.Command)
+		cmd = exec.CommandContext(ctx, "cmd", "/C", job.Command)
 	} else {
-		cmd = exec.Command("sh", "-c", job.Command)
+		cmd = exec.CommandContext(ctx, "sh", "-c", job.Command)
 	}
 
 	var stdout, stderr bytes.Buffer
@@ -29,9 +37,14 @@ func Run(job *Job) {
 
 	if err != nil {
 		job.Status = StatusFailed
+		// Check if timeout occurred
+		if ctx.Err() == context.DeadlineExceeded {
+			job.Stdout = "Command execution timed out after 30 seconds"
+		}
 	} else {
 		job.Status = StatusCompleted
 	}
 
 	job.UpdatedAt = time.Now()
+	store.Update(job)
 }

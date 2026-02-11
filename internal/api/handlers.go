@@ -21,6 +21,8 @@ var AllowedJobs = map[string]string{
 	"say_hello":    "echo Hello from automation runner!",
 	"echo-test":    "echo This is a test",
 	"date":         "date",
+	"sleep":        "powershell -Command Start-Sleep -Seconds 40",
+	"timeout":      "powershell -Command Start-Sleep -Seconds 40",
 }
 
 func HealthHandler(w http.ResponseWriter, r *http.Request) {
@@ -68,7 +70,7 @@ func JobsHandler(store store.JobStore) http.HandlerFunc {
 				http.Error(w, "failed to create job", http.StatusInternalServerError)
 				return
 			}
-			go job.Run(newJob)
+			go job.Run(newJob, store)
 
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(newJob)
